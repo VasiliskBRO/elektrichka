@@ -251,29 +251,11 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
 
-const VIEWERS = [
-  ["pelmen_228", "#ff7f50"], ["sonnyi_enot", "#1e90ff"], ["kefir_enjoyer", "#b8b8c4"], ["tunnel_rat", "#9acd32"],
-  ["chai_bez_sahara", "#daa520"], ["nochnaya_smena", "#8a2be2"], ["beliash_fan", "#ff69b4"], ["perron_7", "#2e8b57"],
-  ["zevaka_99", "#ff4500"], ["babkin_klubok", "#d2691e"]
-];
-const REACT = {
-  start: ["ооо квест", "поехали", "я за кефирыча заранее", "мне уже страшно", "👀"],
-  wait: ["читаю...", "👀", "так так так", "страшно вырубите", "кто такой беляшик", "ммм беляш", "думаем чат думаем", "подвох есть 100%"],
-  death: ["F", "F F F", "КАК", "😭😭😭", "ну я же говорил", "кефирыч предупреждал", "мы гении", "минус чат"],
-  ok: ["ЕЕЕ", "кефирыч топ", "живём", "я знал", "изи", "умный чат"],
-  ask: ["дорого вышло", "лор пошёл", "👀👀", "ого", "а может зря"],
-  item: ["норм", "пригодится", "хм", "запомним"],
-  fail: ["блин", "там же было на столбе", "эх", "дед прости"],
-  sleep: ["я спал", "упс", "zzz", "кто уснул"],
-  end_good: ["ЛЕГЕНДЫ", "мы выбрались!!", "я плачу 😭", "ещё раз!", "GG"],
-  end_bad: ["нееет", "ещё раз!!", "это было страшно", "петля...", "F"],
-  wrong: ["кабан", "крот", "котик", "козёл", "корова", "кошак", "кит", "коала"]
-};
+// В демо играет один человек, поэтому без выдуманных зрителей и чисел голосов
+const TALLY = "🗳️ {key} · ";
 
 let st = null;
 let skipFn = null;
-const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-const pick = a => a[Math.floor(Math.random() * a.length)];
 const fill = (t, kw) => t.replace(/\{(\w+)\}/g, (m, k) => (k in kw ? kw[k] : m));
 const has = k => st.bag.includes(k);
 const hearts = () => "❤️".repeat(Math.max(0, st.hearts)) + "🖤".repeat(Q.hearts - Math.max(0, st.hearts));
@@ -320,12 +302,6 @@ function post(kind, nick, text, color) {
   if (nearBottom || kind === "bot" || kind === "me") log.scrollTop = log.scrollHeight;
 }
 const bot = text => post("bot", "kvest_bot", text, "#bf94ff");
-function viewer(text) { const [n, c] = pick(VIEWERS); post("viewer", n, text, c); }
-function react(kind, count) {
-  const list = REACT[kind]; if (!list) return;
-  const k = count ?? rnd(1, 3);
-  for (let i = 0; i < k; i++) setTimeout(() => viewer(pick(list)), 400 + i * rnd(450, 900));
-}
 
 /* ---------- оверлей ---------- */
 function board() {
@@ -418,45 +394,31 @@ function timerLoop(seconds, onEnd) {
   }, 100);
   return () => clearInterval(id);
 }
-function showBars(options, counts, win) {
-  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+function showBars(options, win) {
   const ul = $("bars"); ul.textContent = "";
   for (const o of options) {
     const li = document.createElement("li"); li.className = "bar" + (o.key === win ? " win" : "");
     li.innerHTML = '<span class="bar-fill"></span><span class="bar-key"></span><span></span><span class="bar-n"></span>';
-    li.children[1].textContent = o.key; li.children[2].textContent = o.label; li.children[3].textContent = counts[o.key] || "";
+    li.children[1].textContent = o.key; li.children[2].textContent = o.label; li.children[3].textContent = o.key === win ? "✓" : "";
     ul.append(li);
-    requestAnimationFrame(() => { li.children[0].style.width = ((counts[o.key] || 0) / total * 100) + "%"; });
+    requestAnimationFrame(() => { li.children[0].style.width = o.key === win ? "100%" : "0"; });
   }
 }
 function vote(options, seconds) {
   return new Promise(resolve => {
-    const counts = Object.fromEntries(options.map(o => [o.key, 0]));
     let mine = null, ended = false, closing = null;
-    $("poll").hidden = false; $("pollTitle").textContent = "Цифры, чат, быстро-быстро!"; showBars(options, counts);
-    const chatter = setInterval(() => { if (mine === null && Math.random() < 0.35) viewer(pick(REACT.wait)); }, 2600);
+    $("poll").hidden = false; $("pollTitle").textContent = "Цифры, чат, быстро-быстро!"; showBars(options);
     const stop = timerLoop(seconds, finish);
     setControls("vote", options, key => {
-      mine = key; post("me", st.nick, key);
-      if (!closing) {
-        closing = setTimeout(finish, 1600);
-        const crowd = rnd(3, 7);
-        for (let i = 0; i < crowd; i++) setTimeout(() => {
-          if (ended) return;
-          const k = Math.random() < 0.6 ? mine : pick(options).key;
-          counts[k]++; viewer(Math.random() < 0.25 ? k.repeat(rnd(2, 4)) : k); showBars(options, counts);
-        }, 150 + i * 200);
-      }
+      mine = key; post("me", st.nick, key); showBars(options, mine);
+      if (!closing) closing = setTimeout(finish, 1200);
     });
     function finish() {
       if (ended) return; ended = true;
-      stop(); clearInterval(chatter); clearTimeout(closing); setControls("idle"); $("timerText").textContent = "";
+      stop(); clearTimeout(closing); setControls("idle"); $("timerText").textContent = "";
       if (mine === null) { $("pollTitle").textContent = "Голосов нет…"; resolve(null); return; }
-      const others = Math.max(0, ...options.filter(o => o.key !== mine).map(o => counts[o.key]));
-      counts[mine] = Math.max(counts[mine] + 1, others + rnd(1, 4));
-      const total = Object.values(counts).reduce((a, b) => a + b, 0);
-      $("pollTitle").textContent = "Решено"; showBars(options, counts, mine);
-      resolve({ key: mine, votes: counts[mine], total });
+      $("pollTitle").textContent = "Решено"; showBars(options, mine);
+      resolve({ key: mine });
     }
   });
 }
@@ -465,7 +427,6 @@ function word(answers, seconds) {
     const ok = answers.map(norm);
     let ended = false;
     $("poll").hidden = false; $("pollTitle").textContent = "✍️ Пиши слово в чат"; $("bars").textContent = "";
-    const guesses = setInterval(() => { if (Math.random() < 0.7) viewer(pick(REACT.wrong)); }, 2300);
     const stop = timerLoop(seconds, () => finish(null));
     setControls("word", null, text => {
       post("me", st.nick, text);
@@ -473,7 +434,7 @@ function word(answers, seconds) {
     });
     function finish(winner) {
       if (ended) return; ended = true;
-      stop(); clearInterval(guesses); setControls("idle"); $("timerText").textContent = "";
+      stop(); setControls("idle"); $("timerText").textContent = "";
       $("pollTitle").textContent = winner ? "Угадали!" : "Время вышло";
       resolve(winner);
     }
@@ -493,7 +454,6 @@ async function ending(key, pre = "") {
   $("poll").hidden = true;
   if (!e.good) glitch();
   bot(pre + text);
-  react(e.good ? "end_good" : "end_bad", rnd(2, 4));
   const f = found(); f.add(key); store.set("found_" + Q.id, [...f]); renderEndings();
   board();
   await wait(readMs(text), "📊 Итоги");
@@ -508,7 +468,7 @@ async function voteScene(sc, text, allOpts, extraMap) {
     const r = await vote(options, secs);
     if (!r) {
       st.deaths++; st.hearts--; board(); glitch();
-      bot(fill(S.sleep, { hearts: hearts() })); react("sleep");
+      bot(fill(S.sleep, { hearts: hearts() }));
       if (st.hearts <= 0) { await wait(2500); return ending("voice"); }
       options = options.filter(o => o.kind !== "ask"); secs = Q.timers.vote;
       await wait(2500);
@@ -516,18 +476,18 @@ async function voteScene(sc, text, allOpts, extraMap) {
       continue;
     }
     const o = options.find(x => x.key === r.key);
-    const pre = fill(S.tally, { key: r.key, votes: r.votes, total: r.total });
+    const pre = fill(TALLY, { key: r.key });
     take(o.takes);
     if (o.kind === "ending") return ending(o.ending, pre);
     if (o.kind === "ok" || o.kind === "item") {
       give(o.gives);
       if (o.kind === "ok" && sc.score && !died) st.score++;
-      board(); bot(pre + o.reply); react(o.kind);
+      board(); bot(pre + o.reply);
       await wait(readMs(o.reply));
       return;
     }
     if (o.kind === "ask") {
-      st.hearts--; give(o.gives); board(); react("ask");
+      st.hearts--; give(o.gives); board();
       options = options.filter(x => x.kind !== "ask");
       if (st.hearts <= 0) { bot(pre + o.reply + " ❤️−1 → " + hearts()); await wait(readMs(o.reply)); return ending("voice"); }
       secs = Q.timers.revote;
@@ -535,7 +495,7 @@ async function voteScene(sc, text, allOpts, extraMap) {
       continue;
     }
     if (o.kind === "death") {
-      st.deaths++; st.hearts--; died = true; board(); react("death"); glitch();
+      st.deaths++; st.hearts--; died = true; board(); glitch();
       if (st.hearts <= 0) { bot(pre + o.reply + S.death_tail_last); await wait(readMs(o.reply)); return ending("voice"); }
       bot(pre + o.reply + fill(S.death_tail, { hearts: hearts() }));
       await wait(readMs(o.reply));
@@ -555,8 +515,8 @@ async function scene(sc) {
   if (sc.type === "word") {
     bot(fill(sc.text, { t: Q.timers.word }));
     const w = await word(sc.answers, Q.timers.word);
-    if (w) { give(sc.gives); if (sc.score) st.score++; board(); bot(fill(sc.ok, { winner: w })); react("ok"); await wait(readMs(sc.ok)); }
-    else { bot(sc.fail); react("fail"); await wait(readMs(sc.fail)); }
+    if (w) { give(sc.gives); if (sc.score) st.score++; board(); bot(fill(sc.ok, { winner: w })); await wait(readMs(sc.ok)); }
+    else { bot(sc.fail); await wait(readMs(sc.fail)); }
     return;
   }
   if (sc.type === "branch") {
@@ -564,7 +524,7 @@ async function scene(sc) {
     if (b.type === "auto") {
       take(b.takes); if (sc.score) st.score++;
       $("poll").hidden = true; board();
-      bot(fill(b.text, { status: status(sc.n) })); react("ok");
+      bot(fill(b.text, { status: status(sc.n) }));
       await wait(readMs(b.text));
       return;
     }
@@ -582,7 +542,7 @@ async function play(nick) {
   post("mod", "mod_kefirchik", "!квест", "#00ad03");
   setControls("idle");
   await new Promise(r => setTimeout(r, 700));
-  bot(fill(Q.intro, { t: Q.timers.start })); react("start", 2);
+  bot(fill(Q.intro, { t: Q.timers.start }));
   await wait(Q.timers.start * 1000, "🚉 Поехали");
   for (const sc of Q.scenes) { await scene(sc); if (st.ending) break; }
   const e = Q.endings[st.ending];
@@ -599,8 +559,6 @@ async function play(nick) {
 renderEndings();
 st = { nick: "", hearts: Q.hearts, bag: [], deaths: 0, score: 0, ending: null, scene: 0 };
 post("sys", "", "Добро пожаловать в чат!");
-viewer("стримерша опять ушла кушать");
-viewer("скучнооо");
 post("sys", "", "Впиши ник и жми «!квест»: бот увезёт чат в «Последнюю электричку». Звук дождя включится сам.");
 setControls("start");
 </script>
