@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Последняя электричка 23:59</title>
+<link rel="icon" href="avatar.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+/* Раскладка как у Твича: шапка, узкая колонка каналов, плеер с оверлеем квеста, под ним инфо и панели канала, справа чат на всю высоту */
+:root {
+  --bg: #0e0e10;
+  --panel: #18181b;
+  --panel-2: #1f1f23;
+  --line: #2f2f35;
+  --fg: #efeff1;
+  --muted: #adadb8;
+  --purple: #9147ff;
+  --purple-2: #772ce8;
+  --purple-soft: rgba(145, 71, 255, .14);
+  --live: #eb0400;
+  --ok: #00c48c;
+  --glass: rgba(14, 14, 16, .78);
+  --f: "Inter", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f); font-size: 13px; line-height: 1.45; overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-rows: 50px minmax(0, 1fr); }
+
+/* шапка */
+.nav { display: flex; align-items: center; gap: 18px; padding: 0 14px; background: var(--panel); box-shadow: 0 1px 2px rgba(0,0,0,.5); position: relative; z-index: 2; }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px; white-space: nowrap; }
+.logo-mark { width: 28px; height: 28px; border-radius: 6px; background: var(--purple); display: grid; place-items: center; font-size: 15px; }
+.nav-link { font-weight: 600; font-size: 15px; color: var(--fg); opacity: .9; white-space: nowrap; }
+.search { flex: 1; max-width: 380px; margin: 0 auto; height: 36px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); display: flex; align-items: center; padding: 0 12px; }
+.me { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #00c48c, #0e9f6e); flex: none; }
+
+.body { min-height: 0; display: grid; grid-template-columns: 50px minmax(0, 1fr) 340px; }
+
+/* левая колонка */
+.side { background: var(--panel); display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 12px; }
+.side-ico { color: var(--muted); font-size: 16px; margin-bottom: 4px; }
+.side-av { position: relative; width: 30px; height: 30px; border-radius: 50%; background: var(--panel-2); background-size: cover; }
+.side-av.live::after { content: ""; position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%; background: var(--live); border: 2px solid var(--panel); }
+
+/* центр */
+.main { min-width: 0; overflow-y: auto; }
+.player { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - 150px); background: #000; overflow: hidden; }
+.player video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ov { position: absolute; z-index: 2; }
+.chip { background: var(--glass); backdrop-filter: blur(6px); border-radius: 6px; padding: 6px 10px; font-weight: 600; }
+.ov-board { top: 12px; left: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.ov-board .chip { font-variant-numeric: tabular-nums; }
+.ov-scene { top: 12px; right: 12px; display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; }
+.ov-scene .em { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; background: var(--purple-soft); }
+.ov-scene small { display: block; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.ov-scene b { font-size: 16px; }
+.ov-mute { bottom: 12px; right: 12px; width: 38px; height: 38px; border: 0; display: grid; place-items: center; font-size: 17px; }
+.ov-live { bottom: 14px; left: 12px; background: var(--live); color: #fff; border-radius: 4px; padding: 1px 6px; font-weight: 700; font-size: 12px; text-transform: uppercase; }
+
+.brb { inset: 0; display: grid; place-items: center; background: rgba(14,14,16,.35); }
+.brb-card { text-align: center; padding: 22px 30px; border-radius: 10px; background: var(--glass); backdrop-filter: blur(6px); }
+.brb-card .t { font-size: clamp(20px, 3vw, 34px); font-weight: 800; letter-spacing: -.01em; }
+.brb-card .s { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+.poll { left: 50%; bottom: 46px; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); padding: 12px 14px; border-radius: 8px; background: var(--glass); backdrop-filter: blur(8px); border: 1px solid rgba(145,71,255,.5); }
+.poll-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; margin-bottom: 8px; }
+.poll-head b { color: var(--purple); font-variant-numeric: tabular-nums; }
+.timer { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; margin-bottom: 10px; }
+.timer-fill { height: 100%; width: 100%; background: var(--purple); transform-origin: left; }
+.bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bar { position: relative; display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 4px; background: rgba(255,255,255,.06); overflow: hidden; }
+.bar-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(145,71,255,.35); transition: width .4s ease; }
+.bar > :not(.bar-fill) { position: relative; }
+.bar-key { font-weight: 800; color: #bf94ff; }
+.bar-n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar.win { box-shadow: inset 0 0 0 1px #bf94ff; }
+.bar.win .bar-fill { background: rgba(145,71,255,.6); }
+
+.flash { inset: 0; pointer-events: none; opacity: 0; background: rgba(235, 4, 0, .45); mix-blend-mode: hard-light; }
+.flash.on { animation: glitch .7s steps(7) 1; }
+@keyframes glitch {
+  0% { opacity: .9; transform: translateX(-6px); }
+  30% { opacity: .5; transform: translateX(5px) skewX(4deg); }
+  60% { opacity: .7; transform: translateX(-3px); }
+  100% { opacity: 0; transform: none; }
+}
+.player.shake video { animation: shake .45s steps(6) 1; }
+@keyframes shake { 0%,100% { transform: none; } 25% { transform: translate(4px,-2px); filter: hue-rotate(40deg) saturate(2); } 50% { transform: translate(-5px,2px); } 75% { transform: translate(2px,1px); filter: grayscale(1); } }
+
+/* инфо о канале */
+.info { display: flex; gap: 14px; padding: 16px 20px 12px; }
+.info-av { flex: none; width: 64px; height: 64px; border-radius: 50%; padding: 3px; border: 2px solid var(--live); position: relative; }
+.info-av img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+.info-av .tag { position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); background: var(--live); color: #fff; font-size: 10px; font-weight: 800; border-radius: 3px; padding: 0 5px; text-transform: uppercase; white-space: nowrap; }
+.info-text { min-width: 0; flex: 1; }
+.info-name { font-size: 18px; font-weight: 700; }
+.info-title { font-size: 14px; font-weight: 600; margin-top: 2px; }
+.info-cat { color: #bf94ff; font-weight: 600; }
+.tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.tags span { background: var(--panel-2); border-radius: 10px; padding: 1px 9px; color: var(--muted); font-weight: 600; font-size: 12px; }
+.follow { align-self: flex-start; height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--purple); font-weight: 700; }
+.follow:hover { background: var(--purple-2); }
+
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding: 8px 20px 28px; max-width: 980px; }
+.panel { background: var(--panel); border-radius: 6px; padding: 14px 16px; }
+.panel h3 { margin: 0 0 8px; font-size: 14px; display: flex; justify-content: space-between; }
+.panel h3 span { color: var(--muted); font-weight: 600; }
+.panel p { margin: 0 0 6px; color: var(--muted); }
+.endings-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ending { padding: 6px 8px; border-radius: 4px; background: var(--panel-2); color: var(--muted); }
+.ending.got { color: var(--fg); box-shadow: inset 0 0 0 1px var(--purple); }
+
+/* чат */
+.chat { min-height: 0; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); }
+.chat-head { height: 50px; flex: none; display: grid; place-items: center; border-bottom: 1px solid var(--line); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.log { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 8px 0; }
+.msg { padding: 4px 20px; overflow-wrap: anywhere; line-height: 20px; }
+.msg .nick { font-weight: 700; }
+.msg-bot { background: var(--purple-soft); box-shadow: inset 3px 0 0 var(--purple); padding-top: 6px; padding-bottom: 6px; margin: 2px 0; }
+.msg-sys { color: var(--muted); padding: 6px 20px; }
+.badge { display: inline-grid; place-items: center; vertical-align: -3px; width: 18px; height: 18px; margin-right: 4px; border-radius: 3px; font-size: 10px; font-weight: 800; }
+.badge-bot { background: var(--purple); color: #fff; }
+.badge-mod { background: #00ad03; color: #fff; }
+.msg-me .nick { color: var(--ok); }
+
+.controls { flex: none; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; gap: 8px; }
+.row > input { flex: 1; min-width: 0; }
+.field { height: 40px; padding: 0 10px; border-radius: 6px; border: 2px solid transparent; background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); }
+.field:focus { outline: none; border-color: var(--purple); background: var(--bg); }
+.lbl { font-size: 12px; color: var(--muted); font-weight: 600; }
+.btn { height: 40px; padding: 0 14px; border-radius: 6px; border: 0; background: var(--panel-2); font-weight: 700; }
+.btn:hover { background: #26262c; }
+.btn-main { background: var(--purple); }
+.btn-main:hover { background: var(--purple-2); }
+.opt { display: flex; align-items: center; gap: 10px; text-align: left; min-height: 44px; padding: 6px 10px; border-radius: 6px; border: 0; background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); font-weight: 600; }
+.opt:hover { box-shadow: inset 0 0 0 1px var(--purple); }
+.opt.on { background: var(--purple-soft); box-shadow: inset 0 0 0 2px var(--purple); }
+.opt .k { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 4px; background: var(--purple); font-weight: 800; }
+.hint { font-size: 12px; color: var(--muted); text-align: center; }
+
+@media (max-width: 1100px) { .side, .search, .nav-link { display: none; } .body { grid-template-columns: minmax(0, 1fr) 320px; } }
+@media (max-width: 760px) {
+  body { overflow: auto; }
+  .app { height: auto; display: block; }
+  .body { display: flex; flex-direction: column; }
+  .main { overflow: visible; }
+  .ov-scene b { font-size: 13px; } .ov-scene .em { width: 30px; height: 30px; font-size: 16px; }
+  .poll { bottom: 8px; padding: 8px 10px; } .bar { padding: 3px 8px; }
+  .chat { height: 80vh; border-left: 0; border-top: 1px solid var(--line); }
+  .panels { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .flash.on, .player.shake video { animation: none; } .bar-fill { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="nav">
+    <div class="logo"><span class="logo-mark" aria-hidden="true">🚉</span>Куда ведёт чат</div>
+    <span class="nav-link">Подписки</span>
+    <span class="nav-link">Просмотр</span>
+    <div class="search" aria-hidden="true">Поиск</div>
+    <div class="me" aria-hidden="true"></div>
+  </header>
+
+  <div class="body">
+    <nav class="side" aria-hidden="true">
+      <span class="side-ico">⇥</span>
+      <span class="side-av live" style="background-image:url(avatar.jpg)"></span>
+      <span class="side-av" style="background:#3a2f5c"></span>
+      <span class="side-av" style="background:#2c4a3f"></span>
+      <span class="side-av" style="background:#5a3a2a"></span>
+      <span class="side-av" style="background:#2b3a5c"></span>
+    </nav>
+
+    <main class="main">
+      <div class="player" id="player">
+        <video id="video" src="room.mp4" autoplay muted loop playsinline></video>
+        <div class="ov brb" id="brb">
+          <div class="brb-card"><div class="t">Отошла покушать 🍜</div><div class="s">щас вернусь, чат за главного</div></div>
+        </div>
+        <div class="ov ov-board" id="ovBoard" hidden>
+          <span class="chip" id="bScene">Сцена —</span>
+          <span class="chip" id="bHearts">❤️❤️❤️</span>
+          <span class="chip" id="bBag" title="Рюкзак">🎒 —</span>
+          <span class="chip" id="bDeaths">⚰️ 0</span>
+        </div>
+        <div class="ov chip ov-scene" id="ovScene" hidden>
+          <span class="em" id="sEmoji">🚉</span>
+          <span><small id="sN">Сцена</small><b id="sName">Платформа</b></span>
+        </div>
+        <div class="ov poll" id="poll" hidden>
+          <div class="poll-head"><span id="pollTitle">Голосование</span><b id="timerText"></b></div>
+          <div class="timer"><div class="timer-fill" id="timerFill"></div></div>
+          <ul class="bars" id="bars"></ul>
+        </div>
+        <div class="ov flash" id="flash"></div>
+        <span class="ov ov-live">В эфире</span>
+        <button class="ov chip ov-mute" id="mute" aria-label="Звук">🔇</button>
+      </div>
+
+      <section class="info">
+        <div class="info-av"><img src="avatar.jpg" alt=""><span class="tag">В эфире</span></div>
+        <div class="info-text">
+          <div class="info-name">ushla_pokushat</div>
+          <div class="info-title">щас вернусь, чат за главного · !квест</div>
+          <div class="info-cat">Общение</div>
+          <div class="tags"><span>Русский</span><span>ЧатКвест</span><span>Хоррор</span></div>
+        </div>
+        <button class="follow" type="button">♡ Отслеживать</button>
+      </section>
+
+      <section class="panels">
+        <div class="panel">
+          <h3>Концовки <span id="endCount">0 из 4</span></h3>
+          <ul class="endings-list" id="endList"></ul>
+        </div>
+        <div class="panel">
+          <h3>Как играть</h3>
+          <p>Стримерша отошла, и чат остался один. Бот рассказывает историю, вы голосуете цифрой. Иногда надо написать слово.</p>
+          <p>На настоящем стриме голосует весь чат, здесь твой голос решает за всех. Каждое сообщение бота одной строкой и не длиннее 500 знаков, как в Твиче.</p>
+        </div>
+      </section>
+    </main>
+
+    <aside class="chat" aria-label="Чат">
+      <div class="chat-head">Чат трансляции</div>
+      <ol class="log" id="log" aria-live="polite"></ol>
+      <div class="controls" id="controls"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const Q = {"id": "elektrichka", "title": "Последняя электричка 23:59", "version": 3, "hearts": 3, "timers": {"vote": 25, "revote": 15, "word": 20, "start": 10}, "vote_tag": "Цифры, чат, быстро-быстро!", "mystery": "Беляшик — пассажир, не доехавший домой в 1987-м. Тень он потерял в туннеле и с тех пор ищет, кого оставить вместо себя. Билет 1987 из кроссворда — его.", "items": {"ticket": "🎫 Билет 1987", "flashlight": "🔦 Фонарик", "sprats": "🥫 Килька", "shadow": "👤 Чужая тень"}, "intro": "🚉 КУДА ВЕДЁТ ЧАТ: «Последняя электричка 23:59». Стримерша отошла, а чат проспал свою станцию. Голосуем цифрой, побеждает большинство, считается последний голос. У чата ❤️❤️❤️ рассудка: каждая ошибка и каждый лишний вопрос стоят сердечко, на нуле случится страшное. Ничья — решает Беляшик (угадайте, в чью пользу). Молчание тоже выбор. Отправление через {t} секунд…", "scenes": [{"id": "platform", "n": 1, "emoji": "🚉", "name": "Платформа", "type": "vote", "score": true, "tie": "1", "hint": "Нет тени + «машинист немой» + «всё новое ненастоящее» — три зацепки на всю игру. Объявление про стрелочницу готовит кроссворд и кильку.", "text": "{status} · 🚉 Пустая платформа, 23:59, часы стоят. На столбе объявление: «Пропала стрелочница. Рыжая, усатая, любит рыбу». Ждут двое: горячий Беляшик (пахнет божественно, улыбается во все зубы) и Кефирыч, просрочен на 3 дня. Кефирыч ворчит: «Машинист у нас немой с 87-го. И всё новое тут ненастоящее». Под фонарём у Беляшика почему-то нет тени. С кем ждём поезд? {options} · {tag} ⏳{t}с", "options": [{"key": "1", "label": "Беляшик", "kind": "death", "reply": "💀 Беляшик обнимает чат тёплыми боками: «Тени нет, потому что я не отсюда, хи-хи. А теперь и вы не отсюда». Под фонарём у него наконец появляется тень. Ваша."}, {"key": "2", "label": "Кефирыч", "kind": "ok", "reply": "✅ Кефирыч, не оборачиваясь: «Хоть кто-то умеет смотреть под ноги. Держитесь меня, я тут с осени, всех знаю». Беляшик машет вслед и облизывается."}, {"key": "3", "label": "Шёпотом спросить про тень (−❤️)", "kind": "ask", "reply": "❓ Кефирыч шепчет в ответ: «Он с 87-го. Тень потерял в туннеле и с тех пор ищет, кого оставить вместо себя. Не ведитесь на запах». Ну так с кем ждём?"}]}, {"id": "wagon", "n": 2, "emoji": "🚃", "name": "Вагон", "type": "vote", "score": true, "tie": "1", "hint": "Нитки тянутся к спящим, пассажиры худые, Кефирыч: «главное — не спать».", "text": "{status} · 🚃 Электричка подъехала без единого звука. В вагоне мигает свет. Слева бабушка вяжет бесконечный шарф: нитки тянутся к спящим пассажирам, и те какие-то подозрительно худые. Справа дед с кроссвордом грызёт карандаш. Кефирыч бурчит: «Главное — не спать». Куда садимся? {options} · {tag} ⏳{t}с", "options": [{"key": "1", "label": "К бабушке, у неё тепло", "kind": "death", "reply": "💀 «Садитесь, милые, отдохните». Чат зевнул всего один раз. Спицы щёлкнули: «Как раз на рукав не хватало». Теперь чат — полосатый рукав."}, {"key": "2", "label": "К деду с кроссвордом", "kind": "ok", "reply": "✅ Дед поднимает глаза: «О, молодёжь! Выручайте, последнее слово осталось». Бабушка разочарованно цокает спицами."}, {"key": "3", "label": "Спросить Кефирыча про нитки (−❤️)", "kind": "ask", "reply": "❓ Кефирыч сквозь зубы: «Она с 87-го вяжет. Из тех, кто уснул. Один зевок — и ты петелька». Так к кому садимся?"}]}, {"id": "crossword", "n": 2, "emoji": "✍️", "name": "Кроссворд", "type": "word", "score": true, "answers": ["кошка"], "gives": "ticket", "hint": "Ответ уже был на объявлении в сцене 1, в загадке три признака: стрелка, усы, рыба.", "text": "✍️ Дед тычет карандашом в газету: «Выручайте! Животное, 5 букв, первая К. Работает на стрелке, усатое, рыбу любит. Вертится на языке, хоть убей!» Пишите слово в чат, кто первый? ⏳{t}с", "ok": "✅ «КОШКА! Точно! Это ж наша стрелочница, пропала давеча…» Дед отрывает от газеты пожелтевший билет: «Держите. Он не мой — нашёл под сиденьем ещё в 87-м». 🎒 +Билет 1987 · 🏆 {winner}, дед тебя запомнил!", "fail": "⌛ Дед вздыхает: «Эх, молодёжь… КОШКА же! Стрелочница наша, пропала давеча». И утыкается обратно в газету. Билет так и остался у него в кармане."}, {"id": "station", "n": 3, "emoji": "📢", "name": "Станция Никуда", "type": "vote", "score": true, "tie": "1", "hint": "В сцене 1 сказано, что машинист немой. Кефирыч переспрашивает: «а кто это сказал?»", "text": "{status} · 📢 Электричка тормозит. Динамик хрипит: «Станция Никуда. Уважаемые пассажиры, НЕ выходите из вагона. Повторяю: НЕ выходите». Двери при этом открываются сами. Бабушка перестала вязать и смотрит на вас. Кефирыч чешет крышку: «Погодите… а кто это сказал?» {options} · {tag} ⏳{t}с", "options": [{"key": "1", "label": "Послушаться и остаться", "kind": "death", "reply": "💀 Двери закрываются. Динамик довольно хмыкает: «Спасибо, что остались». Машинист-то немой с 87-го — кто же тогда объявлял? Свет гаснет, и в темноте громко щёлкают спицы."}, {"key": "2", "label": "Выйти на перрон", "kind": "ok", "reply": "✅ Чат выпрыгивает, двери хлопают за спиной. Кефирыч отдувается: «Машинист-то немой! Сразу надо было понять». Электричка уезжает в никуда, динамик ей вслед обиженно шипит."}]}, {"id": "perron", "n": 4, "emoji": "🕯️", "name": "Перрон", "type": "vote", "score": false, "tie": "1", "hint": "Передышка без смерти. Выбор запоминается и решает сцену 6. Подсказка у Кефирыча: батарейки сели, стрелочница любит рыбу.", "text": "{status} · 🕯️ Перрон станции Никуда. На лавке две вещи, а унести можно только одну: фонарик (вдруг пригодится в темноте?) и банка кильки в томате, годна до 1987 года. Кефирыч: «Батарейки тут с 87-го все сели. А стрелочница наша, говорят, рыбку уважает…» Что берём? {options} · {tag} ⏳{t}с", "options": [{"key": "1", "label": "Фонарик", "kind": "item", "gives": "flashlight", "reply": "🔦 Фонарик холодный и тяжёлый. Щёлк — ничего. Щёлк — ничего. Ну, хоть по голове кому-нибудь стукнуть. 🎒 +Фонарик"}, {"key": "2", "label": "Кильку", "kind": "item", "gives": "sprats", "reply": "🥫 Банка булькает, будто внутри кто-то плавает. Кефирыч одобрительно кивает: «Вот это по-нашему». 🎒 +Килька"}]}, {"id": "tunnel", "n": 5, "emoji": "🕳️", "name": "Туннель", "type": "vote", "score": true, "tie": "1", "hint": "Табличка «кто бежит — того догоняет» + Кефирыч уже в нише. Тень «круглая, как от пирожка» — это тень Беляшика, ключ к секретной концовке.", "text": "{status} · 🕳️ Дальше только туннель, 2 км. Табличка: «В 00:00 проходит Поезд-Без-Машиниста. Кто бежит — того догоняет». На часах 23:58. По стене мечется тень без хозяина, круглая, как от пирожка, и ищет, к кому прилипнуть. Кефирыч вжимается в нишу: «Два км за две минуты? Не смешите мой кефир». {options} · {tag} ⏳{t}с", "options": [{"key": "1", "label": "Бежать изо всех сил", "kind": "death", "reply": "💀 Чат бежит. Сзади нарастает гул без стука колёс. «Кто бежит — того догоняет», — успеваете вспомнить вы. Теперь чат — граффити на стене туннеля."}, {"key": "2", "label": "Вжаться в нишу и ждать", "kind": "ok", "reply": "✅ Ровно в 00:00 мимо проносится поезд: ни звука, ни машиниста. В последнем окне машет Беляшик и одними губами говорит: «Ещё увидимся». Тень на стене вздрагивает, будто узнала его."}, {"key": "3", "label": "Позвать тень к себе (−❤️)", "kind": "ask", "gives": "shadow", "reply": "❓ Вы тихонько свистите. Тень замирает, а потом ныряет вам под ноги, холодная, как погреб, и пахнет беляшами. Кефирыч: «Это ж его тень… Ну вы и коллекционеры». 🎒 +Чужая тень. Поезд вот-вот!"}]}, {"id": "switch", "n": 6, "emoji": "🐈", "name": "Стрелка", "type": "branch", "score": true, "hint": "Кошка — та самая стрелочница с объявления. С килькой проходим сразу, с фонариком — загадка.", "branches": [{"if": "sprats", "type": "auto", "takes": "sprats", "text": "{status} · 🐈 Туннель кончается развилкой путей. У рычага сидит рыжая кошка в фуражке, та самая пропавшая стрелочница! Кильку она учуяла раньше, чем вы достали банку: «Мурр… 1987-й, винтаж! Проходите». Рычаг лязгает, путь открыт. ✅"}, {"if": "flashlight", "type": "vote", "tie": "2", "text": "{status} · 🐈 Туннель кончается развилкой путей. У рычага сидит рыжая кошка в фуражке, та самая пропавшая стрелочница! «Мурр. Без платы стрелку не переведу». Обнюхивает фонарик и фыркает: «Не рыба. Тогда загадка: что становится больше, если из него брать?» {options} · {tag} ⏳{t}с", "options": [{"key": "1", "label": "Яма", "kind": "ok", "takes": "flashlight", "reply": "✅ «Яма. Скучно, но верно». Рычаг лязгает, путь открыт. Фонарик кошка всё-таки забирает: «Мышей светить буду»."}, {"key": "2", "label": "Тень", "kind": "death", "reply": "💀 «Тень? Из тени берут — и она кончается. Спросите у Беляшика». Кошка зевает, и чат проваливается между шпал."}]}]}, {"id": "final", "n": 7, "emoji": "🛤️", "name": "Дрезины", "type": "vote", "score": true, "tie": "1", "hint": "«Всё новое тут ненастоящее» из сцены 1. Третий вариант виден, только если чат забрал тень.", "text": "{status} · 🛤️ За стрелкой две дрезины. Слева новенькая, блестящая, табличка «ДОМОЙ» горит тёплым неоном. Справа ржавая и скрипучая, на ней «ДОМОЙ» кто-то зачеркнул. Кефирыч косится на блестящую и морщится, но молчит: сами, мол, думайте.{extra} Последний выбор! {options} · {tag} ⏳{t}с", "extra": {"shadow": " Чужая тень в рюкзаке тянется назад, к туннелю, где пахнет беляшами."}, "options": [{"key": "1", "label": "Блестящая «ДОМОЙ»", "kind": "ending", "ending": "loop"}, {"key": "2", "label": "Ржавая, зачёркнутая", "kind": "ending", "ending": "dawn"}, {"key": "3", "label": "Вернуть тень Беляшику", "kind": "ending", "ending": "secret", "requires": "shadow", "takes": "shadow"}]}], "endings": {"loop": {"emoji": "🔁", "name": "Петля", "good": false, "text": "🔁 КОНЦОВКА «ПЕТЛЯ». Дрезина едет мягко-мягко, неон светит тепло… и тормозит у пустой платформы. 23:59, часы стоят. Под фонарём Беляшик без тени улыбается во все зубы: «С возвращением». Кефирыч вздыхает: «Я же говорил — всё новое тут ненастоящее»."}, "dawn": {"emoji": "✨", "name": "Рассвет", "good": true, "text": "✨ КОНЦОВКА «РАССВЕТ». Ржавая дрезина скрипит, кашляет и всё-таки едет. Туннель светлеет, пахнет мокрой травой и утром. Обычная станция, 6:40, первая электричка. Кефирыч спрыгивает на перрон: «Не благодари. И кефир берите свежий». ЧАТ ВЫБРАЛСЯ!"}, "secret": {"emoji": "🌟", "name": "Тёплый беляш", "good": true, "secret": true, "text": "🌟 СЕКРЕТНАЯ КОНЦОВКА «ТЁПЛЫЙ БЕЛЯШ». Беляшик ждёт у туннеля. Тень соскальзывает к нему и прирастает, и он впервые за 39 лет остывает. «Спасибо… А можно с вами?» Он едет на ржавой дрезине у вас на коленях, тихий и тёплый. Утром в киоске у станции новый ценник: «Беляш 1987 — для своих бесплатно».", "text_ticket": "🌟 СЕКРЕТНАЯ КОНЦОВКА «ТЁПЛЫЙ БЕЛЯШ». Тень прирастает к Беляшику, и он впервые за 39 лет остывает. Вы протягиваете билет деда. Беляшик шепчет: «Это же мой… я тогда так и не доехал». На рассвете он сходит с ржавой дрезины на своей станции, в 1987-м. А утром в киоске новый ценник: «Беляш 1987 — для своих бесплатно»."}, "voice": {"emoji": "🌀", "name": "Голос", "good": false, "text": "🌀 КОНЦОВКА «ГОЛОС». Рассудок кончился. Чат садится в пустую кабину машиниста, берёт микрофон и слышит свой голос из всех динамиков сразу: «Станция Никуда. Уважаемые пассажиры, НЕ выходите из вагона». Теперь объявляете вы. Кефирыч снимает крышку: «Эх… хорошие были»."}}, "system": {"status": "Сцена {n}/7 · {hearts}", "tally": "🗳️ {key} — {votes} из {total} · ", "tie": "⚖️ Ничья! Из темноты шепчет Беляшик: «Я помогу, хи-хи…» Выбран вариант {key}.", "sleep": "😴 Тишина… Чат уснул, а спать здесь нельзя: где-то рядом щёлкают спицы. ⚰️ +1 · {hearts}", "wake": "{status} · Просыпаемся! {options} · {tag} ⏳{t}с", "ask_tail": " ❤️−1 → {hearts}. {options} · ⏳{t}с", "death_tail": " ⚰️ +1 · {hearts} · ⏪ Время дёргается назад — чат пробует другую дверь.", "death_tail_last": " ⚰️ +1 · 🖤🖤🖤 · Рассудок кончился…", "summary": "📊 ИТОГ «Последняя электричка 23:59» · Концовка: {ending} · Угадано: {score}/7 · Рассудок: {hearts} · Звание: {rank} · ⚰️ Кладбище чата: {deaths} · 🎒 {bag} · {tease} · Ещё раз — !квест", "tease_hidden": "Говорят, есть секретная концовка 👀", "tease_found": "Секретная концовка найдена! 🌟", "ranks": [{"min": 7, "name": "Машинист 🚂"}, {"min": 5, "name": "Проводник"}, {"min": 3, "name": "Пассажир"}, {"min": 0, "name": "Безбилетник"}], "rank_voice": "Голос из динамика"}};
+const S = Q.system;
+const TOTAL = Math.max(...Q.scenes.map(s => s.n));
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+const VIEWERS = [
+  ["pelmen_228", "#ff7f50"], ["sonnyi_enot", "#1e90ff"], ["kefir_enjoyer", "#b8b8c4"], ["tunnel_rat", "#9acd32"],
+  ["chai_bez_sahara", "#daa520"], ["nochnaya_smena", "#8a2be2"], ["beliash_fan", "#ff69b4"], ["perron_7", "#2e8b57"],
+  ["zevaka_99", "#ff4500"], ["babkin_klubok", "#d2691e"]
+];
+const REACT = {
+  start: ["ооо квест", "поехали", "я за кефирыча заранее", "мне уже страшно", "👀"],
+  wait: ["читаю...", "👀", "так так так", "страшно вырубите", "кто такой беляшик", "ммм беляш", "думаем чат думаем", "подвох есть 100%"],
+  death: ["F", "F F F", "КАК", "😭😭😭", "ну я же говорил", "кефирыч предупреждал", "мы гении", "минус чат"],
+  ok: ["ЕЕЕ", "кефирыч топ", "живём", "я знал", "изи", "умный чат"],
+  ask: ["дорого вышло", "лор пошёл", "👀👀", "ого", "а может зря"],
+  item: ["норм", "пригодится", "хм", "запомним"],
+  fail: ["блин", "там же было на столбе", "эх", "дед прости"],
+  sleep: ["я спал", "упс", "zzz", "кто уснул"],
+  end_good: ["ЛЕГЕНДЫ", "мы выбрались!!", "я плачу 😭", "ещё раз!", "GG"],
+  end_bad: ["нееет", "ещё раз!!", "это было страшно", "петля...", "F"],
+  wrong: ["кабан", "крот", "котик", "козёл", "корова", "кошак", "кит", "коала"]
+};
+
+let st = null;
+let skipFn = null;
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const fill = (t, kw) => t.replace(/\{(\w+)\}/g, (m, k) => (k in kw ? kw[k] : m));
+const has = k => st.bag.includes(k);
+const hearts = () => "❤️".repeat(Math.max(0, st.hearts)) + "🖤".repeat(Q.hearts - Math.max(0, st.hearts));
+const status = n => fill(S.status, { n, hearts: hearts() });
+const optStr = os => os.map(o => `${o.key} — ${o.label}`).join(" | ");
+const readMs = t => Math.min(9000, Math.max(2600, 1200 + t.length * 20));
+const norm = t => t.toLowerCase().replace(/ё/g, "е").replace(/[^a-zа-я]/g, "");
+const plural = n => {
+  const m10 = n % 10, m100 = n % 100;
+  const w = m10 === 1 && m100 !== 11 ? "смерть" : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? "смерти" : "смертей";
+  return `${n} ${w}`;
+};
+
+/* ---------- видео и звук ---------- */
+const video = $("video"), muteBtn = $("mute");
+video.volume = 0.6;
+function setMuted(m) { video.muted = m; muteBtn.textContent = m ? "🔇" : "🔊"; }
+muteBtn.onclick = () => { setMuted(!video.muted); video.play().catch(() => {}); };
+function glitch() {
+  const f = $("flash"), p = $("player");
+  f.classList.remove("on"); p.classList.remove("shake"); void f.offsetWidth;
+  f.classList.add("on"); p.classList.add("shake");
+  setTimeout(() => p.classList.remove("shake"), 500);
+}
+
+/* ---------- чат ---------- */
+const log = $("log");
+function post(kind, nick, text, color) {
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 120;
+  const li = document.createElement("li");
+  li.className = "msg msg-" + kind;
+  if (kind === "sys") {
+    li.textContent = text;
+  } else {
+    if (kind === "bot") li.insertAdjacentHTML("beforeend", '<span class="badge badge-bot" title="Бот">🤖</span>');
+    if (kind === "mod") li.insertAdjacentHTML("beforeend", '<span class="badge badge-mod" title="Модератор">⚔</span>');
+    const n = document.createElement("span");
+    n.className = "nick"; n.textContent = nick; if (color) n.style.color = color;
+    li.append(n, document.createTextNode(": " + text));
+    if (kind === "bot") li.title = `${[...text].length} знаков из 500`;
+  }
+  log.append(li);
+  while (log.children.length > 220) log.firstChild.remove();
+  if (nearBottom || kind === "bot" || kind === "me") log.scrollTop = log.scrollHeight;
+}
+const bot = text => post("bot", "kvest_bot", text, "#bf94ff");
+function viewer(text) { const [n, c] = pick(VIEWERS); post("viewer", n, text, c); }
+function react(kind, count) {
+  const list = REACT[kind]; if (!list) return;
+  const k = count ?? rnd(1, 3);
+  for (let i = 0; i < k; i++) setTimeout(() => viewer(pick(list)), 400 + i * rnd(450, 900));
+}
+
+/* ---------- оверлей ---------- */
+function board() {
+  $("bScene").textContent = st.scene ? `Сцена ${st.scene}/${TOTAL}` : "Сцена —";
+  $("bHearts").textContent = hearts();
+  $("bBag").textContent = "🎒 " + (st.bag.length ? st.bag.map(k => Q.items[k].split(" ")[0]).join(" ") : "—");
+  $("bBag").title = "Рюкзак: " + (st.bag.map(k => Q.items[k]).join(", ") || "пусто");
+  $("bDeaths").textContent = "⚰️ " + st.deaths;
+}
+function setScene(emoji, small, name) {
+  $("ovScene").hidden = false;
+  $("sEmoji").textContent = emoji; $("sN").textContent = small; $("sName").textContent = name;
+}
+function found() { return new Set(store.get("found_" + Q.id, [])); }
+function renderEndings() {
+  const f = found(), list = $("endList");
+  list.textContent = "";
+  for (const [k, e] of Object.entries(Q.endings)) {
+    const li = document.createElement("li");
+    li.className = "ending" + (f.has(k) ? " got" : "");
+    li.textContent = f.has(k) ? `${e.emoji} ${e.name}` : e.secret ? "🔒 секретная" : "❔ ???";
+    list.append(li);
+  }
+  $("endCount").textContent = `${f.size} из ${Object.keys(Q.endings).length}`;
+}
+
+/* ---------- кнопки внизу чата ---------- */
+const controls = $("controls");
+function setControls(mode, arg, cb) {
+  controls.textContent = "";
+  if (mode === "start" || mode === "end") {
+    const lbl = document.createElement("label");
+    lbl.className = "lbl"; lbl.htmlFor = "nick"; lbl.textContent = "Твой ник в чате";
+    const row = document.createElement("div"); row.className = "row";
+    const inp = document.createElement("input");
+    inp.id = "nick"; inp.className = "field"; inp.maxLength = 25; inp.autocomplete = "off";
+    inp.value = store.get("nick", "passazhir_2359");
+    const b = document.createElement("button");
+    b.className = "btn btn-main"; b.textContent = mode === "start" ? "▶ !квест" : "🔁 Ещё раз";
+    const go = () => { const v = inp.value.trim().replace(/\s+/g, "_") || "passazhir_2359"; store.set("nick", v); play(v); };
+    b.onclick = go; inp.onkeydown = e => { if (e.key === "Enter") go(); };
+    row.append(inp, b);
+    controls.append(lbl, row);
+  } else if (mode === "skip") {
+    const b = document.createElement("button");
+    b.className = "btn"; b.textContent = arg || "⏩ Дальше";
+    b.onclick = () => skipFn && skipFn();
+    controls.append(b);
+  } else if (mode === "vote") {
+    for (const o of arg) {
+      const b = document.createElement("button");
+      b.className = "opt"; b.dataset.k = o.key;
+      b.innerHTML = '<span class="k"></span><span></span>';
+      b.children[0].textContent = o.key; b.children[1].textContent = o.label;
+      b.onclick = () => { controls.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); cb(o.key); };
+      controls.append(b);
+    }
+    const h = document.createElement("div"); h.className = "hint";
+    h.textContent = "Жми цифру. Передумал — жми другую, считается последний голос";
+    controls.append(h);
+  } else if (mode === "word") {
+    const f = document.createElement("form"); f.className = "row";
+    const inp = document.createElement("input");
+    inp.id = "word"; inp.className = "field"; inp.placeholder = "Отправить сообщение"; inp.autocomplete = "off"; inp.maxLength = 40;
+    const b = document.createElement("button"); b.className = "btn btn-main"; b.textContent = "Чат";
+    f.onsubmit = e => { e.preventDefault(); const v = inp.value.trim(); if (v) { inp.value = ""; cb(v); } inp.focus(); };
+    f.append(inp, b); controls.append(f); inp.focus();
+  } else {
+    const h = document.createElement("div"); h.className = "hint"; h.textContent = "…";
+    controls.append(h);
+  }
+}
+
+/* ---------- ожидание, голосование, слово ---------- */
+function wait(ms, label) {
+  return new Promise(res => {
+    const t = setTimeout(done, ms);
+    function done() { clearTimeout(t); skipFn = null; setControls("idle"); res(); }
+    skipFn = done; setControls("skip", label);
+  });
+}
+function timerLoop(seconds, onEnd) {
+  const end = Date.now() + seconds * 1000;
+  const fillEl = $("timerFill"), txt = $("timerText");
+  const id = setInterval(() => {
+    const left = Math.max(0, end - Date.now());
+    fillEl.style.transform = `scaleX(${left / (seconds * 1000)})`;
+    txt.textContent = "⏳ " + Math.ceil(left / 1000) + "с";
+    if (left <= 0) { clearInterval(id); onEnd(); }
+  }, 100);
+  return () => clearInterval(id);
+}
+function showBars(options, counts, win) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+  const ul = $("bars"); ul.textContent = "";
+  for (const o of options) {
+    const li = document.createElement("li"); li.className = "bar" + (o.key === win ? " win" : "");
+    li.innerHTML = '<span class="bar-fill"></span><span class="bar-key"></span><span></span><span class="bar-n"></span>';
+    li.children[1].textContent = o.key; li.children[2].textContent = o.label; li.children[3].textContent = counts[o.key] || "";
+    ul.append(li);
+    requestAnimationFrame(() => { li.children[0].style.width = ((counts[o.key] || 0) / total * 100) + "%"; });
+  }
+}
+function vote(options, seconds) {
+  return new Promise(resolve => {
+    const counts = Object.fromEntries(options.map(o => [o.key, 0]));
+    let mine = null, ended = false, closing = null;
+    $("poll").hidden = false; $("pollTitle").textContent = "Цифры, чат, быстро-быстро!"; showBars(options, counts);
+    const chatter = setInterval(() => { if (mine === null && Math.random() < 0.35) viewer(pick(REACT.wait)); }, 2600);
+    const stop = timerLoop(seconds, finish);
+    setControls("vote", options, key => {
+      mine = key; post("me", st.nick, key);
+      if (!closing) {
+        closing = setTimeout(finish, 1600);
+        const crowd = rnd(3, 7);
+        for (let i = 0; i < crowd; i++) setTimeout(() => {
+          if (ended) return;
+          const k = Math.random() < 0.6 ? mine : pick(options).key;
+          counts[k]++; viewer(Math.random() < 0.25 ? k.repeat(rnd(2, 4)) : k); showBars(options, counts);
+        }, 150 + i * 200);
+      }
+    });
+    function finish() {
+      if (ended) return; ended = true;
+      stop(); clearInterval(chatter); clearTimeout(closing); setControls("idle"); $("timerText").textContent = "";
+      if (mine === null) { $("pollTitle").textContent = "Голосов нет…"; resolve(null); return; }
+      const others = Math.max(0, ...options.filter(o => o.key !== mine).map(o => counts[o.key]));
+      counts[mine] = Math.max(counts[mine] + 1, others + rnd(1, 4));
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
+      $("pollTitle").textContent = "Решено"; showBars(options, counts, mine);
+      resolve({ key: mine, votes: counts[mine], total });
+    }
+  });
+}
+function word(answers, seconds) {
+  return new Promise(resolve => {
+    const ok = answers.map(norm);
+    let ended = false;
+    $("poll").hidden = false; $("pollTitle").textContent = "✍️ Пиши слово в чат"; $("bars").textContent = "";
+    const guesses = setInterval(() => { if (Math.random() < 0.7) viewer(pick(REACT.wrong)); }, 2300);
+    const stop = timerLoop(seconds, () => finish(null));
+    setControls("word", null, text => {
+      post("me", st.nick, text);
+      if (ok.includes(norm(text))) finish(st.nick);
+    });
+    function finish(winner) {
+      if (ended) return; ended = true;
+      stop(); clearInterval(guesses); setControls("idle"); $("timerText").textContent = "";
+      $("pollTitle").textContent = winner ? "Угадали!" : "Время вышло";
+      resolve(winner);
+    }
+  });
+}
+
+/* ---------- сцены ---------- */
+function give(k) { if (k && !st.bag.includes(k)) st.bag.push(k); }
+function take(k) { if (k) st.bag = st.bag.filter(x => x !== k); }
+
+async function ending(key, pre = "") {
+  const e = Q.endings[key];
+  st.ending = key;
+  if (e.good) st.score++;
+  const text = e.text_ticket && has("ticket") ? e.text_ticket : e.text;
+  setScene(e.emoji, "Концовка", e.name);
+  $("poll").hidden = true;
+  if (!e.good) glitch();
+  bot(pre + text);
+  react(e.good ? "end_good" : "end_bad", rnd(2, 4));
+  const f = found(); f.add(key); store.set("found_" + Q.id, [...f]); renderEndings();
+  board();
+  await wait(readMs(text), "📊 Итоги");
+}
+
+async function voteScene(sc, text, allOpts, extraMap) {
+  let options = allOpts.filter(o => !o.requires || has(o.requires));
+  const extra = Object.entries(extraMap || {}).filter(([k]) => has(k)).map(([, v]) => v).join("");
+  bot(fill(text, { status: status(sc.n), options: optStr(options), tag: Q.vote_tag, t: Q.timers.vote, extra }));
+  let secs = Q.timers.vote, died = false;
+  for (;;) {
+    const r = await vote(options, secs);
+    if (!r) {
+      st.deaths++; st.hearts--; board(); glitch();
+      bot(fill(S.sleep, { hearts: hearts() })); react("sleep");
+      if (st.hearts <= 0) { await wait(2500); return ending("voice"); }
+      options = options.filter(o => o.kind !== "ask"); secs = Q.timers.vote;
+      await wait(2500);
+      bot(fill(S.wake, { status: status(sc.n), options: optStr(options), tag: Q.vote_tag, t: secs }));
+      continue;
+    }
+    const o = options.find(x => x.key === r.key);
+    const pre = fill(S.tally, { key: r.key, votes: r.votes, total: r.total });
+    take(o.takes);
+    if (o.kind === "ending") return ending(o.ending, pre);
+    if (o.kind === "ok" || o.kind === "item") {
+      give(o.gives);
+      if (o.kind === "ok" && sc.score && !died) st.score++;
+      board(); bot(pre + o.reply); react(o.kind);
+      await wait(readMs(o.reply));
+      return;
+    }
+    if (o.kind === "ask") {
+      st.hearts--; give(o.gives); board(); react("ask");
+      options = options.filter(x => x.kind !== "ask");
+      if (st.hearts <= 0) { bot(pre + o.reply + " ❤️−1 → " + hearts()); await wait(readMs(o.reply)); return ending("voice"); }
+      secs = Q.timers.revote;
+      bot(pre + o.reply + fill(S.ask_tail, { hearts: hearts(), options: optStr(options), t: secs }));
+      continue;
+    }
+    if (o.kind === "death") {
+      st.deaths++; st.hearts--; died = true; board(); react("death"); glitch();
+      if (st.hearts <= 0) { bot(pre + o.reply + S.death_tail_last); await wait(readMs(o.reply)); return ending("voice"); }
+      bot(pre + o.reply + fill(S.death_tail, { hearts: hearts() }));
+      await wait(readMs(o.reply));
+      const good = options.find(x => x.kind === "ok");
+      take(good.takes); give(good.gives);
+      bot(good.reply); board();
+      await wait(readMs(good.reply));
+      return;
+    }
+  }
+}
+
+async function scene(sc) {
+  st.scene = sc.n; board();
+  setScene(sc.emoji, `Сцена ${sc.n} из ${TOTAL}`, sc.name);
+  if (sc.type === "vote") return voteScene(sc, sc.text, sc.options, sc.extra);
+  if (sc.type === "word") {
+    bot(fill(sc.text, { t: Q.timers.word }));
+    const w = await word(sc.answers, Q.timers.word);
+    if (w) { give(sc.gives); if (sc.score) st.score++; board(); bot(fill(sc.ok, { winner: w })); react("ok"); await wait(readMs(sc.ok)); }
+    else { bot(sc.fail); react("fail"); await wait(readMs(sc.fail)); }
+    return;
+  }
+  if (sc.type === "branch") {
+    const b = sc.branches.find(x => has(x.if)) || sc.branches[sc.branches.length - 1];
+    if (b.type === "auto") {
+      take(b.takes); if (sc.score) st.score++;
+      $("poll").hidden = true; board();
+      bot(fill(b.text, { status: status(sc.n) })); react("ok");
+      await wait(readMs(b.text));
+      return;
+    }
+    return voteScene(sc, b.text, b.options, b.extra);
+  }
+}
+
+async function play(nick) {
+  st = { nick, hearts: Q.hearts, bag: [], deaths: 0, score: 0, ending: null, scene: 0 };
+  setMuted(false); video.play().catch(() => {});
+  log.textContent = "";
+  $("brb").hidden = true; $("ovBoard").hidden = false; $("poll").hidden = true; board();
+  setScene("🚉", "Отправление", "Платформа 23:59");
+  post("sys", "", "Добро пожаловать в чат! Ты здесь как " + nick);
+  post("mod", "mod_kefirchik", "!квест", "#00ad03");
+  setControls("idle");
+  await new Promise(r => setTimeout(r, 700));
+  bot(fill(Q.intro, { t: Q.timers.start })); react("start", 2);
+  await wait(Q.timers.start * 1000, "🚉 Поехали");
+  for (const sc of Q.scenes) { await scene(sc); if (st.ending) break; }
+  const e = Q.endings[st.ending];
+  const rank = st.ending === "voice" ? S.rank_voice : S.ranks.find(r => st.score >= r.min).name;
+  const tease = found().has("secret") ? S.tease_found : S.tease_hidden;
+  bot(fill(S.summary, {
+    ending: `${e.emoji} ${e.name}`, score: st.score, hearts: hearts(), rank,
+    deaths: plural(st.deaths), bag: st.bag.length ? st.bag.map(k => Q.items[k]).join(", ") : "пусто", tease
+  }));
+  setControls("end");
+}
+
+/* ---------- старт ---------- */
+renderEndings();
+st = { nick: "", hearts: Q.hearts, bag: [], deaths: 0, score: 0, ending: null, scene: 0 };
+post("sys", "", "Добро пожаловать в чат!");
+viewer("стримерша опять ушла кушать");
+viewer("скучнооо");
+post("sys", "", "Впиши ник и жми «!квест»: бот увезёт чат в «Последнюю электричку». Звук дождя включится сам.");
+setControls("start");
+</script>
+</body>
+</html>
